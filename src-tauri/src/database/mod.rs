@@ -28,7 +28,7 @@ pub struct Database {
 impl Database {
     /// 初始化数据库连接并运行迁移
     ///
-    /// 数据库文件位于 `~/.cc-switch/quicktools.db`
+    /// 数据库文件位于应用配置目录下的 `quicktools.db`
     pub fn init() -> Result<Self, AppError> {
         let db_path = Self::get_db_path();
 

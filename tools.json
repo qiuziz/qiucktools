@@ -8,7 +8,8 @@
     "command": "git pull",
     "workingDir": "~",
     "timeoutMs": 60000,
-    "params": []
+    "params": [],
+    "enabled": true
   },
   {
     "id": "git-status",
@@ -18,7 +19,8 @@
     "type": "shell",
     "command": "git status",
     "workingDir": "~",
-    "params": []
+    "params": [],
+    "enabled": true
   },
   {
     "id": "ee-apply-branch",
@@ -31,7 +33,8 @@
     "params": [
       { "name": "projectName", "label": "项目名称", "type": "text", "required": true },
       { "name": "branchName", "label": "分支名称", "type": "text", "required": true }
-    ]
+    ],
+    "enabled": true
   },
   {
     "id": "open-brain",
@@ -40,7 +43,8 @@
     "description": "用 VSCode 打开 brain 项目",
     "type": "shell",
     "command": "code ~/work/brain",
-    "params": []
+    "params": [],
+    "enabled": true
   },
   {
     "id": "open-logs-page",
@@ -49,6 +53,7 @@
     "description": "切换到日志页面",
     "type": "notification",
     "command": "打开日志页面",
-    "params": []
+    "params": [],
+    "enabled": true
   }
 ]

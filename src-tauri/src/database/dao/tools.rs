@@ -17,9 +17,14 @@ pub struct Tool {
     #[serde(rename = "timeoutMs")]
     pub timeout_ms: i64,
     pub params: Vec<ToolParam>,
-    #[serde(rename = "sortOrder")]
+    #[serde(rename = "sortOrder", default)]
     pub sort_order: i64,
+    #[serde(default = "default_enabled_true")]
     pub enabled: bool,
+}
+
+fn default_enabled_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

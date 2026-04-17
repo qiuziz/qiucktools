@@ -2,17 +2,16 @@ use std::path::{Path, PathBuf};
 
 use crate::error::AppError;
 
-/// 获取用户主目录，带回退和日志
+/// 获取用户主目录，带回退
 pub fn get_home_dir() -> PathBuf {
-    dirs::home_dir().unwrap_or_else(|| {
-        log::warn!("无法获取用户主目录，回退到当前目录");
-        PathBuf::from(".")
-    })
+    dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
 }
 
-/// 获取应用配置目录
+/// 获取应用配置目录（macOS: ~/Library/Application Support/QuickTools）
 pub fn get_app_config_dir() -> PathBuf {
-    get_home_dir().join(".cc-switch")
+    dirs::data_dir()
+        .map(|d| d.join("QuickTools"))
+        .unwrap_or_else(get_home_dir)
 }
 
 /// 获取 Claude Code 配置目录路径

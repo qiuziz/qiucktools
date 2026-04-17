@@ -10,14 +10,20 @@ const TOOLS_JSON_PATH: &str = "~/work/quicktools/tools.json";
 pub async fn load_tools(state: tauri::State<'_, AppState>) -> Result<Vec<Tool>, String> {
     let path = crate::services::executor::expand_home(TOOLS_JSON_PATH);
 
-    state
+    let tools = state
         .db
         .with_tools_dao(|conn| {
             ToolDao::load_from_file(conn, &path)
-                .map_err(|err: Box<dyn std::error::Error>| crate::AppError::Message(err.to_string()))?;
+                .map_err(|err: Box<dyn std::error::Error>| {
+                    log::warn!("Failed to load tools from {}: {err}", path);
+                    crate::AppError::Message(err.to_string())
+                })?;
             ToolDao::list(conn).map_err(Into::into)
         })
-        .map_err(Into::into)
+        .map_err(|e| e.to_string())?;
+
+    log::info!("Loaded {} tools from {}", tools.len(), path);
+    Ok(tools)
 }
 
 #[tauri::command]

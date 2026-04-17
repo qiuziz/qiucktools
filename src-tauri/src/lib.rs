@@ -65,9 +65,89 @@ fn macos_tray_icon() -> Option<Image<'static>> {
     }
 }
 
+/// 获取 macOS 标准应用数据目录
+fn get_mac_data_dir() -> Option<std::path::PathBuf> {
+    dirs::data_dir().map(|d| d.join("QuickTools"))
+}
+
+/// 从旧配置目录迁移到新目录
+fn migrate_old_config() {
+    let old_dir = dirs::home_dir().map(|h| h.join(".cc-switch"));
+    let new_dir = get_mac_data_dir();
+
+    let (Some(old), Some(new)) = (old_dir, new_dir) else {
+        return;
+    };
+
+    if !old.exists() {
+        return;
+    }
+    if new.exists() {
+        return;
+    }
+
+    eprintln!(
+        "[QuickTools] Migrating config from {} to {}",
+        old.display(),
+        new.display()
+    );
+
+    // Create new directory
+    if let Err(e) = std::fs::create_dir_all(&new) {
+        eprintln!("[QuickTools] Failed to create new config dir: {e}");
+        return;
+    }
+
+    // Migrate each file
+    let files = ["quicktools.db", "settings.json"];
+    for file in files {
+        let src = old.join(file);
+        let dst = new.join(file);
+        if src.exists() {
+            if let Err(e) = std::fs::copy(&src, &dst) {
+                eprintln!("[QuickTools] Failed to copy {file}: {e}");
+            } else {
+                eprintln!("[QuickTools] Migrated {file}");
+            }
+        }
+    }
+
+    // Migrate logs directory
+    let logs_src = old.join("logs");
+    let logs_dst = new.join("logs");
+    if logs_src.exists() && logs_src.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&logs_src) {
+            if let Err(e) = std::fs::create_dir_all(&logs_dst) {
+                eprintln!("[QuickTools] Failed to create logs dir: {e}");
+            } else {
+                for entry in entries.flatten() {
+                    let file_name = entry.file_name();
+                    let src_file = logs_src.join(&file_name);
+                    let dst_file = logs_dst.join(&file_name);
+                    let _ = std::fs::copy(&src_file, &dst_file);
+                }
+                eprintln!("[QuickTools] Migrated logs/");
+            }
+        }
+    }
+
+    // Archive old crash log
+    let crash_log = old.join("crash.log");
+    let crash_log_bak = old.join("crash.log.bak");
+    if crash_log.exists() {
+        let _ = std::fs::rename(&crash_log, &crash_log_bak);
+        eprintln!("[QuickTools] Archived crash.log -> crash.log.bak");
+    }
+
+    eprintln!("[QuickTools] Migration complete");
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 设置 panic hook，在应用崩溃时记录日志到 <app_config_dir>/crash.log（默认 ~/.cc-switch/crash.log）
+    // 迁移旧配置目录（如果存在）
+    migrate_old_config();
+
+    // 设置 panic hook，在应用崩溃时记录日志到 <app_config_dir>/crash.log
     panic_hook::setup_panic_hook();
 
     let mut builder = tauri::Builder::default();
@@ -121,7 +201,7 @@ pub fn run() {
             app_store::refresh_app_config_dir_override(app.handle());
             panic_hook::init_app_config_dir(crate::config::get_app_config_dir());
 
-            // 初始化日志（单文件输出到 <app_config_dir>/logs/cc-switch.log）
+            // 初始化日志（单文件输出到 <app_config_dir>/logs/quicktools.log）
             {
                 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
@@ -133,7 +213,7 @@ pub fn run() {
                 }
 
                 // 启动时删除旧日志文件，实现单文件覆盖效果
-                let log_file_path = log_dir.join("cc-switch.log");
+                let log_file_path = log_dir.join("quicktools.log");
                 let _ = std::fs::remove_file(&log_file_path);
 
                 app.handle().plugin(
@@ -144,7 +224,7 @@ pub fn run() {
                             Target::new(TargetKind::Stdout),
                             Target::new(TargetKind::Folder {
                                 path: log_dir,
-                                file_name: Some("cc-switch".into()),
+                                file_name: Some("quicktools".into()),
                             }),
                         ])
                         // 单文件模式：启动时删除旧文件，达到大小时轮转
@@ -160,7 +240,7 @@ pub fn run() {
 
             // 初始化数据库
             let app_config_dir = crate::config::get_app_config_dir();
-            let db_path = app_config_dir.join("cc-switch.db");
+            let db_path = app_config_dir.join("quicktools.db");
 
             let db = loop {
                 match crate::database::Database::init() {

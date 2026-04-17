@@ -48,7 +48,7 @@ fn default_minimize_to_tray_on_close() -> bool {
 
 /// 应用设置结构
 ///
-/// 存储设备级别设置，保存在本地 `~/.cc-switch/settings.json`
+/// 存储设备级别设置，保存在本地 `~/Library/Application Support/QuickTools/settings.json`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -94,11 +94,7 @@ impl Default for AppSettings {
 static SETTINGS: OnceLock<RwLock<AppSettings>> = OnceLock::new();
 
 fn get_settings_path() -> Option<PathBuf> {
-    Some(
-        get_home_dir()
-            .join(".cc-switch")
-            .join("settings.json"),
-    )
+    Some(crate::config::get_app_config_dir().join("settings.json"))
 }
 
 fn normalize_paths(_settings: &mut AppSettings) {
@@ -176,7 +172,3 @@ pub fn update_settings(new_settings: AppSettings) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Get home directory
-fn get_home_dir() -> PathBuf {
-    dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
-}
