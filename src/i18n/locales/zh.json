@@ -2450,5 +2450,33 @@
     "expiredHint": "请运行 {{tool}} 命令刷新登录",
     "queryFailed": "查询失败",
     "refresh": "刷新"
+  },
+  "tools": {
+    "title": "工具",
+    "execute": "执行",
+    "executed": "工具已执行: {{name}}",
+    "executionFailed": "执行失败",
+    "empty": "暂无工具配置",
+    "emptyHint": "请在 ~/work/quicktools/tools.json 中添加工具",
+    "refresh": "刷新"
+  },
+  "logs": {
+    "title": "执行日志",
+    "empty": "暂无执行日志",
+    "filter": "筛选",
+    "all": "全部",
+    "success": "成功",
+    "failed": "失败",
+    "timeout": "超时",
+    "pageInfo": "第 {{page}} 页，共 {{total}} 页"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "languageDesc": "选择您的首选语言",
+    "theme": "主题",
+    "themeDesc": "选择您喜欢的外观",
+    "about": "关于",
+    "toolsConfig": "工具配置"
   }
 }

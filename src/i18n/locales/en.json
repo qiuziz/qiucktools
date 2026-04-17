@@ -2449,5 +2449,33 @@
     "expiredHint": "Run the {{tool}} command to refresh your login",
     "queryFailed": "Query failed",
     "refresh": "Refresh"
+  },
+  "tools": {
+    "title": "Tools",
+    "execute": "Run",
+    "executed": "Tool executed: {{name}}",
+    "executionFailed": "Execution failed",
+    "empty": "No tools configured",
+    "emptyHint": "Add tools to ~/work/quicktools/tools.json",
+    "refresh": "Refresh"
+  },
+  "logs": {
+    "title": "Execution Logs",
+    "empty": "No execution logs",
+    "filter": "Filter",
+    "all": "All",
+    "success": "Success",
+    "failed": "Failed",
+    "timeout": "Timeout",
+    "pageInfo": "Page {{page}} of {{total}}"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageDesc": "Select your preferred language",
+    "theme": "Theme",
+    "themeDesc": "Choose your preferred appearance",
+    "about": "About",
+    "toolsConfig": "Tools config"
   }
 }

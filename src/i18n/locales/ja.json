@@ -2449,5 +2449,33 @@
     "expiredHint": "{{tool}}コマンドを実行してログインを更新してください",
     "queryFailed": "クエリに失敗しました",
     "refresh": "更新"
+  },
+  "tools": {
+    "title": "ツール",
+    "execute": "実行",
+    "executed": "ツールを実行しました: {{name}}",
+    "executionFailed": "実行に失敗しました",
+    "empty": "ツールが設定されていません",
+    "emptyHint": "~/work/quicktools/tools.json にツールを追加してください",
+    "refresh": "更新"
+  },
+  "logs": {
+    "title": "実行ログ",
+    "empty": "実行ログがありません",
+    "filter": "フィルター",
+    "all": "すべて",
+    "success": "成功",
+    "failed": "失敗",
+    "timeout": "タイムアウト",
+    "pageInfo": "{{page}} / {{total}} ページ"
+  },
+  "settings": {
+    "title": "設定",
+    "language": "言語",
+    "languageDesc": "お好みの言語を選択してください",
+    "theme": "テーマ",
+    "themeDesc": "お好みの外観を選択してください",
+    "about": "について",
+    "toolsConfig": "ツール設定"
   }
 }

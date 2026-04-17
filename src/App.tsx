@@ -1,7 +1,86 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Wrench, History, Settings } from "lucide-react";
+import { Wrench, History, Settings, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+
+import { ToolList, ExecutionPanel, LogViewer, SettingsPage } from "@/components/quicktools";
+import { useTools, useExecution, useLogs } from "@/hooks/useTools";
+
+function ToolsPage() {
+  const { t } = useTranslation();
+  const { tools, loading, error, refresh } = useTools();
+  const { executing, result, execute, clearResult } = useExecution();
+
+  const handleExecute = useCallback(
+    async (toolId: string, params: Record<string, string>) => {
+      try {
+        const execResult = await execute(toolId, params);
+        toast.success(
+          t("tools.executed", "Tool executed: {{name}}", { name: execResult.toolName }),
+          {
+            description: execResult.status,
+          }
+        );
+      } catch {
+        toast.error(t("tools.executionFailed", "Execution failed"));
+      }
+    },
+    [execute, t]
+  );
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">{t("tools.title", "Tools")}</h2>
+        <Button variant="outline" size="sm" onClick={refresh}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          {t("common.refresh", "Refresh")}
+        </Button>
+      </div>
+
+      <ToolList
+        tools={tools}
+        loading={loading}
+        error={error}
+        onExecute={handleExecute}
+        executing={executing}
+        result={result}
+      />
+
+      <ExecutionPanel result={result} onClose={clearResult} />
+    </div>
+  );
+}
+
+function LogsPage() {
+  const { t } = useTranslation();
+  const { logs, total, loading, query, goToPage, updateQuery, refresh } = useLogs({
+    page: 1,
+    pageSize: 20,
+  });
+
+  return (
+    <div className="h-full">
+      <LogViewer
+        logs={logs}
+        total={total}
+        loading={loading}
+        page={query.page || 1}
+        pageSize={query.pageSize || 20}
+        statusFilter={query.status}
+        onPageChange={goToPage}
+        onStatusFilterChange={(status) => updateQuery({ status, page: 1 })}
+        onRefresh={refresh}
+      />
+    </div>
+  );
+}
+
+function SettingsContent() {
+  return <SettingsPage />;
+}
 
 function App() {
   const { t } = useTranslation();
@@ -26,22 +105,16 @@ function App() {
           </TabsList>
         </div>
 
-        <TabsContent value="tools" className="flex-1 overflow-auto p-4">
-          <div className="text-muted-foreground text-sm text-center mt-20">
-            工具管理 — Phase 4 实现
-          </div>
+        <TabsContent value="tools" className="flex-1 overflow-auto p-4 m-0">
+          <ToolsPage />
         </TabsContent>
 
-        <TabsContent value="logs" className="flex-1 overflow-auto p-4">
-          <div className="text-muted-foreground text-sm text-center mt-20">
-            执行日志 — Phase 4 实现
-          </div>
+        <TabsContent value="logs" className="flex-1 overflow-auto p-4 m-0">
+          <LogsPage />
         </TabsContent>
 
-        <TabsContent value="settings" className="flex-1 overflow-auto p-4">
-          <div className="text-muted-foreground text-sm text-center mt-20">
-            设置页面 — Phase 4 实现
-          </div>
+        <TabsContent value="settings" className="flex-1 overflow-auto p-4 m-0">
+          <SettingsContent />
         </TabsContent>
       </Tabs>
     </div>
