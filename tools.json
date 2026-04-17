@@ -1,0 +1,54 @@
+[
+  {
+    "id": "git-pull",
+    "name": "Git Pull",
+    "icon": "git-branch",
+    "description": "拉取当前分支最新代码",
+    "type": "shell",
+    "command": "git pull",
+    "workingDir": "~",
+    "timeoutMs": 60000,
+    "params": []
+  },
+  {
+    "id": "git-status",
+    "name": "Git Status",
+    "icon": "terminal",
+    "description": "查看当前分支状态",
+    "type": "shell",
+    "command": "git status",
+    "workingDir": "~",
+    "params": []
+  },
+  {
+    "id": "ee-apply-branch",
+    "name": "EE Apply Branch",
+    "icon": "zap",
+    "description": "为 EE 项目申请分支",
+    "type": "shell",
+    "command": "node ~/work/brain/scripts/ee-branch-apply.js",
+    "workingDir": "~/work/brain",
+    "params": [
+      { "name": "projectName", "label": "项目名称", "type": "text", "required": true },
+      { "name": "branchName", "label": "分支名称", "type": "text", "required": true }
+    ]
+  },
+  {
+    "id": "open-brain",
+    "name": "打开 Brain 项目",
+    "icon": "folder-open",
+    "description": "用 VSCode 打开 brain 项目",
+    "type": "shell",
+    "command": "code ~/work/brain",
+    "params": []
+  },
+  {
+    "id": "open-logs-page",
+    "name": "打开日志页面",
+    "icon": "list",
+    "description": "切换到日志页面",
+    "type": "notification",
+    "command": "打开日志页面",
+    "params": []
+  }
+]

@@ -1,50 +1,19 @@
 //! 数据库模块 - SQLite 数据持久化
 //!
 //! 此模块提供应用的核心数据存储功能，包括：
-//! - 通用设置存储
-//!
-//! ## 架构设计
-//!
-//! ```text
-//! database/
-//! ├── mod.rs        - Database 结构体 + 初始化
-//! ├── schema.rs     - 表结构定义 + Schema 迁移
-//! └── dao/          - 数据访问对象
-//!     └── settings.rs
-//! ```
+//! - Tools 管理
+//! - 执行日志
+//! - 通用设置
 
 mod dao;
+mod migration;
 mod schema;
 
 use crate::config::get_app_config_dir;
 use crate::error::AppError;
 use rusqlite::Connection;
-use serde::Serialize;
+use std::path::PathBuf;
 use std::sync::Mutex;
-
-// DAO 方法通过 impl Database 提供，无需额外导出
-
-/// 当前 Schema 版本号
-/// 每次修改表结构时递增，并在 schema.rs 中添加相应的迁移逻辑
-pub(crate) const SCHEMA_VERSION: i32 = 1;
-
-/// 安全地序列化 JSON，避免 unwrap panic
-pub(crate) fn to_json_string<T: Serialize>(value: &T) -> Result<String, AppError> {
-    serde_json::to_string(value)
-        .map_err(|e| AppError::Config(format!("JSON serialization failed: {e}")))
-}
-
-/// 安全地获取 Mutex 锁，避免 unwrap panic
-macro_rules! lock_conn {
-    ($mutex:expr) => {
-        $mutex
-            .lock()
-            .map_err(|e| AppError::Database(format!("Mutex lock failed: {}", e)))?
-    };
-}
-
-// 导出宏供子模块使用
-pub(crate) use lock_conn;
 
 /// 数据库连接封装
 ///
@@ -55,11 +24,11 @@ pub struct Database {
 }
 
 impl Database {
-    /// 初始化数据库连接并创建表
+    /// 初始化数据库连接并运行迁移
     ///
-    /// 数据库文件位于 `~/.cc-switch/cc-switch.db`
+    /// 数据库文件位于 `~/.cc-switch/quicktools.db`
     pub fn init() -> Result<Self, AppError> {
-        let db_path = get_app_config_dir().join("cc-switch.db");
+        let db_path = Self::get_db_path();
 
         // 确保父目录存在
         if let Some(parent) = db_path.parent() {
@@ -75,12 +44,24 @@ impl Database {
         let db = Self {
             conn: Mutex::new(conn),
         };
-        db.create_tables()?;
+        db.run_migrations()?;
 
         Ok(db)
     }
 
+    /// 获取数据库文件路径
+    fn get_db_path() -> PathBuf {
+        get_app_config_dir().join("quicktools.db")
+    }
+
+    /// 运行数据库迁移
+    fn run_migrations(&self) -> Result<(), AppError> {
+        let conn = self.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+        migration::run_migrations(&conn).map_err(|e| AppError::Database(e.to_string()))
+    }
+
     /// 创建内存数据库（用于测试）
+    #[cfg(test)]
     pub fn memory() -> Result<Self, AppError> {
         let conn = Connection::open_in_memory().map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -91,14 +72,38 @@ impl Database {
         let db = Self {
             conn: Mutex::new(conn),
         };
-        db.create_tables()?;
+        db.run_migrations()?;
 
         Ok(db)
     }
 
+    /// 使用 Tools DAO 访问数据库
+    pub fn with_tools_dao<T, F>(&self, f: F) -> Result<T, AppError>
+    where
+        F: FnOnce(&Connection) -> Result<T, AppError>,
+    {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        f(&conn)
+    }
+
+    /// 使用 Logs DAO 访问数据库
+    pub fn with_logs_dao<T, F>(&self, f: F) -> Result<T, AppError>
+    where
+        F: FnOnce(&Connection) -> Result<T, AppError>,
+    {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        f(&conn)
+    }
+
     /// Get a setting value by key
     pub fn get_setting(&self, key: &str) -> Result<Option<String>, AppError> {
-        let conn = lock_conn!(self.conn);
+        let conn = self.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
         let result = conn.query_row(
             "SELECT value FROM settings WHERE key = ?",
             [key],
@@ -113,7 +118,7 @@ impl Database {
 
     /// Set a setting value
     pub fn set_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
-        let conn = lock_conn!(self.conn);
+        let conn = self.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
             [key, value],
@@ -124,7 +129,7 @@ impl Database {
 
     /// Get log configuration
     pub fn get_log_config(&self) -> Result<LogConfig, AppError> {
-        let conn = lock_conn!(self.conn);
+        let conn = self.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
         conn.query_row(
             "SELECT enabled, level FROM log_config WHERE id = 1",
             [],
