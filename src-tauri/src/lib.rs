@@ -9,6 +9,7 @@ mod init_status;
 mod panic_hook;
 #[cfg(target_os = "linux")]
 mod linux_fix;
+mod services;
 mod settings;
 mod store;
 
@@ -113,6 +114,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
             // 预先刷新 Store 覆盖配置，确保后续路径读取正确（日志/数据库等）
@@ -287,6 +289,9 @@ pub fn run() {
             commands::set_auto_launch,
             commands::get_auto_launch_status,
             commands::set_window_theme,
+            commands::load_tools,
+            commands::execute_tool,
+            commands::get_logs,
             update_tray_menu,
         ]);
 

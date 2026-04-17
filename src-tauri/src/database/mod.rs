@@ -9,6 +9,8 @@ mod dao;
 mod migration;
 mod schema;
 
+pub use dao::{ExecutionLog, LogDao, LogQuery, Tool, ToolDao, ToolParam, ToolParamOption};
+
 use crate::config::get_app_config_dir;
 use crate::error::AppError;
 use rusqlite::Connection;
