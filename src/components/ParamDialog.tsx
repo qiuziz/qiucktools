@@ -59,11 +59,21 @@ export function ParamDialog({ toolId, onClose }: ParamDialogProps) {
       }
     }
     fetchTool();
-  }, [toolId, onClose]);
+  }, [toolId]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!tool) return;
+
+    const missingRequired = tool.params.filter(
+      (p) => p.required && !formValues[p.name]
+    );
+    if (missingRequired.length > 0) {
+      toast.error(
+        `请填写必填字段: ${missingRequired.map((p) => p.label).join(", ")}`
+      );
+      return;
+    }
 
     setSubmitting(true);
     try {
