@@ -1,11 +1,13 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Wrench, History, Settings, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { listen } from "@tauri-apps/api/event";
 
 import { ToolList, ExecutionPanel, LogViewer, SettingsPage } from "@/components/quicktools";
+import { ParamDialog } from "@/components/ParamDialog";
 import { useTools, useExecution, useLogs } from "@/hooks/useTools";
 
 function ToolsPage() {
@@ -84,9 +86,28 @@ function SettingsContent() {
 
 function App() {
   const { t } = useTranslation();
+  const [paramDialogToolId, setParamDialogToolId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unlisten = listen<string | { toolId?: string }>("open_param_dialog", (event) => {
+      const payload = event.payload;
+      const toolId =
+        typeof payload === "string" ? payload : payload?.toolId;
+      if (toolId) setParamDialogToolId(toolId);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-background">
+      {paramDialogToolId && (
+        <ParamDialog
+          toolId={paramDialogToolId}
+          onClose={() => setParamDialogToolId(null)}
+        />
+      )}
       <Tabs defaultValue="tools" className="h-full flex flex-col">
         <div className="border-b px-4 py-2 flex items-center justify-between">
           <TabsList>
