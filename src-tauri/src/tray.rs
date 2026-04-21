@@ -4,11 +4,24 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
 use tauri::menu::{Menu, MenuBuilder, MenuItem, Submenu, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
-use crate::database::ToolDao;
 use crate::store::AppState;
+
+const TOOLS_JSON_PATH: &str = "~/work/quicktools/tools.json";
+
+/// 与 tools.json 格式匹配的 Tool 结构（JSON 用 "type"，非 "toolType"）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ToolForTray {
+    id: String,
+    name: String,
+    #[serde(rename = "type")]
+    tool_type: String,
+    enabled: Option<bool>,
+}
 
 /// 工具类型的菜单元数据
 struct ToolTypeMenu {
@@ -59,7 +72,7 @@ fn build_tools_submenu<R: tauri::Runtime>(
     _type_key: &str,
     label: &str,
     icon: &str,
-    tools: &[crate::database::Tool],
+    tools: &[ToolForTray],
 ) -> Result<Submenu<R>, crate::error::AppError> {
     let menu_label = format!("{icon} {label}");
     let mut builder = SubmenuBuilder::new(app, &menu_label);
@@ -85,28 +98,50 @@ fn build_tools_submenu<R: tauri::Runtime>(
         .map_err(|e| crate::error::AppError::Message(e.to_string()))
 }
 
+/// 从 tools.json 直接加载工具（跳过数据库，启动时数据库可能还是空的）
+fn load_tools_from_json() -> Vec<ToolForTray> {
+    let path = expand_home(TOOLS_JSON_PATH);
+    match std::fs::read_to_string(&path) {
+        Ok(content) => match serde_json::from_str::<Vec<ToolForTray>>(&content) {
+            Ok(tools) => tools,
+            Err(e) => {
+                log::warn!("Failed to parse {}: {e}", path.display());
+                vec![]
+            }
+        },
+        Err(e) => {
+            log::warn!("Failed to read {}: {e}", path.display());
+            vec![]
+        }
+    }
+}
+
+fn expand_home(path: &str) -> std::path::PathBuf {
+    if path.starts_with("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(path.trim_start_matches("~/"));
+        }
+    }
+    std::path::PathBuf::from(path)
+}
+
 /// 创建托盘菜单
 pub fn create_tray_menu<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-    app_state: &AppState,
+    _app_state: &AppState,
 ) -> Result<Menu<R>, crate::error::AppError> {
     let settings = crate::settings::get_settings();
     let language = settings.language.as_deref().unwrap_or("zh");
     let texts = TrayTexts::from_language(language);
 
-    // Load enabled tools from database
-    let tools: Vec<crate::database::Tool> = app_state
-        .db
-        .with_tools_dao(|conn| {
-            let all: Vec<crate::database::Tool> = ToolDao::list(conn)?;
-            Ok(all)
-        })?
+    // Load enabled tools directly from tools.json (DB may be empty at startup)
+    let tools: Vec<ToolForTray> = load_tools_from_json()
         .into_iter()
-        .filter(|t| t.enabled)
+        .filter(|t| t.enabled.unwrap_or(true))
         .collect();
 
     // Group tools by type
-    let mut grouped: HashMap<&str, Vec<crate::database::Tool>> = HashMap::new();
+    let mut grouped: HashMap<&str, Vec<ToolForTray>> = HashMap::new();
     for tool in &tools {
         grouped.entry(&tool.tool_type).or_default().push(tool.clone());
     }
@@ -202,19 +237,12 @@ mod tests {
     use std::time::Duration;
     use tauri::Listener;
 
-    fn make_tool(id: &str, name: &str, tool_type: &str) -> crate::database::Tool {
-        crate::database::Tool {
+    fn make_tool(id: &str, name: &str, tool_type: &str) -> ToolForTray {
+        ToolForTray {
             id: id.to_string(),
             name: name.to_string(),
-            icon: "test-icon".to_string(),
-            description: None,
             tool_type: tool_type.to_string(),
-            command: "echo test".to_string(),
-            working_dir: "".to_string(),
-            timeout_ms: 5000,
-            params: vec![],
-            sort_order: 0,
-            enabled: true,
+            enabled: Some(true),
         }
     }
 
@@ -237,7 +265,7 @@ mod tests {
     fn test_build_tools_submenu_empty() {
         let app = tauri::test::mock_app();
         let app_handle = app.handle();
-        let tools: Vec<crate::database::Tool> = vec![];
+        let tools: Vec<ToolForTray> = vec![];
 
         let result = build_tools_submenu(&app_handle, "shell", "Shell 工具", "🔧", &tools);
         assert!(result.is_ok(), "should build submenu with disabled placeholder: {:?}", result.err());
