@@ -56,7 +56,7 @@
     "name": "打开 Brain 项目",
     "icon": "folder-open",
     "description": "用 VSCode 打开 brain 项目",
-    "type": "shell",
+    "type": "open",
     "command": "code ~/work/brain",
     "params": [],
     "enabled": true,
