@@ -553,40 +553,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cc-switch"
-version = "3.13.0"
-dependencies = [
- "anyhow",
- "auto-launch",
- "chrono",
- "dirs 5.0.1",
- "log",
- "objc2 0.5.2",
- "objc2-app-kit 0.2.2",
- "rusqlite",
- "serde",
- "serde_json",
- "serial_test",
- "shlex",
- "tauri",
- "tauri-build",
- "tauri-plugin-log",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tauri-plugin-process",
- "tauri-plugin-single-instance",
- "tauri-plugin-store",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "toml 0.8.23",
- "toml_edit 0.22.27",
- "uuid",
- "webkit2gtk",
- "winreg 0.52.0",
-]
-
-[[package]]
 name = "cesu8"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3266,6 +3232,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "quicktools"
+version = "3.13.0"
+dependencies = [
+ "anyhow",
+ "auto-launch",
+ "chrono",
+ "dirs 5.0.1",
+ "log",
+ "objc2 0.5.2",
+ "objc2-app-kit 0.2.2",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "shlex",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-log",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tauri-plugin-process",
+ "tauri-plugin-single-instance",
+ "tauri-plugin-store",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.8.23",
+ "toml_edit 0.22.27",
+ "uuid",
+ "webkit2gtk",
+ "winreg 0.52.0",
 ]
 
 [[package]]

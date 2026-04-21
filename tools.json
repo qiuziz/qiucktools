@@ -9,7 +9,8 @@
     "workingDir": "~",
     "timeoutMs": 60000,
     "params": [],
-    "enabled": true
+    "enabled": true,
+    "sortOrder": 0
   },
   {
     "id": "git-status",
@@ -20,7 +21,9 @@
     "command": "git status",
     "workingDir": "~",
     "params": [],
-    "enabled": true
+    "enabled": true,
+    "timeoutMs": 60000,
+    "sortOrder": 0
   },
   {
     "id": "ee-apply-branch",
@@ -31,10 +34,22 @@
     "command": "node ~/work/brain/scripts/ee-branch-apply.js",
     "workingDir": "~/work/brain",
     "params": [
-      { "name": "projectName", "label": "项目名称", "type": "text", "required": true },
-      { "name": "branchName", "label": "分支名称", "type": "text", "required": true }
+      {
+        "name": "projectName",
+        "label": "项目名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "branchName",
+        "label": "分支名称",
+        "type": "text",
+        "required": true
+      }
     ],
-    "enabled": true
+    "enabled": true,
+    "timeoutMs": 60000,
+    "sortOrder": 0
   },
   {
     "id": "open-brain",
@@ -44,7 +59,10 @@
     "type": "shell",
     "command": "code ~/work/brain",
     "params": [],
-    "enabled": true
+    "enabled": true,
+    "timeoutMs": 60000,
+    "workingDir": "~",
+    "sortOrder": 0
   },
   {
     "id": "open-logs-page",
@@ -54,6 +72,9 @@
     "type": "notification",
     "command": "打开日志页面",
     "params": [],
-    "enabled": true
+    "enabled": true,
+    "timeoutMs": 60000,
+    "workingDir": "~",
+    "sortOrder": 0
   }
 ]
