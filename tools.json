@@ -52,6 +52,33 @@
     "sortOrder": 0
   },
   {
+    "id": "replace-p7b",
+    "name": "Replace P7B",
+    "icon": "file-code",
+    "description": "替换 harmonyajkproject 的 debug p7b 签名文件并提交推送",
+    "type": "shell",
+    "command": "bash scripts/replace-p7b.sh {{sourceP7b}} {{branch}}",
+    "workingDir": "~/work/quicktools",
+    "params": [
+      {
+        "name": "sourceP7b",
+        "label": "源 p7b 文件路径",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "branch",
+        "label": "目标分支（留空自动获取最新 release）",
+        "type": "text",
+        "required": false,
+        "default": ""
+      }
+    ],
+    "enabled": true,
+    "timeoutMs": 300000,
+    "sortOrder": 0
+  },
+  {
     "id": "open-brain",
     "name": "打开 Brain 项目",
     "icon": "folder-open",

@@ -211,6 +211,12 @@ pub fn handle_tray_menu_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: 
         _ => {
             // Handle tool clicks: "tool:{tool_id}"
             if let Some(tool_id) = id.strip_prefix("tool:") {
+                // Show and focus the main window first, then open the param dialog.
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.unminimize();
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
                 let payload = serde_json::json!({ "toolId": tool_id });
                 let _ = app.emit("open_param_dialog", payload);
             }

@@ -40,7 +40,7 @@ export function ToolCard({ tool, onExecute, executing, result }: ToolCardProps) 
   const IconComponent = iconMap[tool.icon] || Terminal;
 
   const handleExecute = () => {
-    onExecute(tool.id, params);
+    onExecute(tool.id, { ...getDefaultParams(tool), ...params });
   };
 
   const hasParams = tool.params.length > 0;
@@ -120,6 +120,15 @@ export function ToolCard({ tool, onExecute, executing, result }: ToolCardProps) 
       </CardContent>
     </Card>
   );
+}
+
+function getDefaultParams(tool: Tool): Record<string, string> {
+  return tool.params.reduce<Record<string, string>>((defaults, param) => {
+    if (param.default !== undefined && param.default !== null) {
+      defaults[param.name] = String(param.default);
+    }
+    return defaults;
+  }, {});
 }
 
 interface ToolListProps {

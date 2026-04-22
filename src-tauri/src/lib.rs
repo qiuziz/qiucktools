@@ -260,14 +260,30 @@ pub fn run() {
 
             // 构建托盘
             let mut tray_builder = TrayIconBuilder::with_id("main")
-                .on_tray_icon_event(|_tray, event| match event {
-                    // 左键点击已通过 show_menu_on_left_click(true) 打开菜单，这里不再额外处理
-                    TrayIconEvent::Click { .. } => {}
-                    _ => log::debug!("unhandled event {event:?}"),
+                .on_tray_icon_event(|_tray, event| {
+                    match event {
+                        TrayIconEvent::Click { .. } => {}
+                        _ => log::debug!("unhandled tray icon event {event:?}"),
+                    }
                 })
                 .menu(&menu)
                 .on_menu_event(|app, event| {
-                    tray::handle_tray_menu_event(app, &event.id.0);
+                    let id = &event.id.0;
+                    if id == "quit" {
+                        app.exit(0);
+                        return;
+                    }
+                    if id == "show" || id.starts_with("tool:") {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.unminimize();
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    if let Some(tool_id) = id.strip_prefix("tool:") {
+                        let payload = serde_json::json!({ "toolId": tool_id });
+                        let _ = app.emit("open_param_dialog", payload);
+                    }
                 })
                 .show_menu_on_left_click(true);
 
