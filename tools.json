@@ -31,20 +31,27 @@
     "icon": "zap",
     "description": "为 EE 项目申请分支",
     "type": "shell",
-    "command": "node ~/work/brain/scripts/ee-branch-apply.js",
+    "command": "node ~/work/brain/scripts/ee-branch-apply.js {{issueId}} {{summary}} {{engineeringKeyword}}",
     "workingDir": "~/work/brain",
     "params": [
       {
-        "name": "projectName",
-        "label": "项目名称",
+        "name": "issueId",
+        "label": "需求 ID 或 URL",
         "type": "text",
         "required": true
       },
       {
-        "name": "branchName",
-        "label": "分支名称",
+        "name": "summary",
+        "label": "分支摘要",
         "type": "text",
         "required": true
+      },
+      {
+        "name": "engineeringKeyword",
+        "label": "工程搜索关键词",
+        "type": "text",
+        "required": false,
+        "default": ""
       }
     ],
     "enabled": true,
