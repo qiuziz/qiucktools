@@ -108,8 +108,8 @@ export function ParamDialog({ toolId, onClose }: ParamDialogProps) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md">
-        <form onSubmit={handleSubmit}>
+      <DialogContent className="max-w-md overflow-hidden">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
           <DialogHeader>
             <DialogTitle>{tool.name}</DialogTitle>
             {tool.description && (
@@ -117,9 +117,11 @@ export function ParamDialog({ toolId, onClose }: ParamDialogProps) {
             )}
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 px-6 py-5">
             {tool.params.length === 0 && (
-              <p className="text-sm text-muted-foreground">No parameters required.</p>
+              <p className="text-sm text-muted-foreground">
+                No parameters required.
+              </p>
             )}
             {tool.params.map((param) => (
               <ParamField

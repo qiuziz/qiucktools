@@ -86,6 +86,151 @@
     "sortOrder": 0
   },
   {
+    "id": "harmony-webview-devtools-ajk",
+    "name": "AJK WebView DevTools",
+    "icon": "terminal",
+    "description": "将安居客 Harmony WebView DevTools 转发到本机 9222 端口",
+    "type": "shell",
+    "command": "bash scripts/chromedev.sh anjuke",
+    "workingDir": "~/work/quicktools",
+    "params": [],
+    "enabled": true,
+    "timeoutMs": 60000,
+    "sortOrder": 0
+  },
+  {
+    "id": "harmony-webview-devtools-wuba",
+    "name": "Wuba WebView DevTools",
+    "icon": "terminal",
+    "description": "将 58 同城 Harmony WebView DevTools 转发到本机 9222 端口",
+    "type": "shell",
+    "command": "bash scripts/chromedev.sh wuba",
+    "workingDir": "~/work/quicktools",
+    "params": [],
+    "enabled": true,
+    "timeoutMs": 60000,
+    "sortOrder": 0
+  },
+  {
+    "id": "miniapp-host-update-dev-mps",
+    "name": "更新小程序宿主分包",
+    "icon": "file-code",
+    "description": "更新 miniapp-host 的 dev.mps.json，并提交推送",
+    "type": "shell",
+    "command": "bash scripts/dev-mps.sh -p {{packageName}} -v {{version}}",
+    "workingDir": "~/work/quicktools",
+    "params": [
+      {
+        "name": "packageName",
+        "label": "MPS 包名或匹配关键词",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "version",
+        "label": "版本号或版本标识",
+        "type": "text",
+        "required": true
+      }
+    ],
+    "enabled": true,
+    "timeoutMs": 300000,
+    "sortOrder": 0
+  },
+  {
+    "id": "miniapp-host-start-integration",
+    "name": "拉取小程序集成版本",
+    "icon": "terminal",
+    "description": "运行 miniapp-host 集成预览模式，拉取当前集成 MPS 包版本",
+    "type": "shell",
+    "command": "zsh -lc \"pnpm start {{miniapp}}\"",
+    "workingDir": "~/work/brain/projects/miniapp-host/code",
+    "params": [
+      {
+        "name": "miniapp",
+        "label": "小程序宿主",
+        "type": "select",
+        "required": true,
+        "default": "anjuke_weapp",
+        "options": [
+          { "value": "anjuke_weapp", "label": "安居客微信" },
+          { "value": "anjuke_weapp_plugin", "label": "安居客微信插件" },
+          { "value": "anjuke_alipay", "label": "安居客支付宝" },
+          { "value": "anjuke_swan", "label": "安居客百度" },
+          { "value": "anjuke_tt", "label": "安居客抖音" },
+          { "value": "anjuke_kwai", "label": "安居客快手" },
+          { "value": "wuba_weapp", "label": "58房产微信" },
+          { "value": "tongcheng_weapp", "label": "58同城微信" }
+        ]
+      }
+    ],
+    "enabled": true,
+    "timeoutMs": 600000,
+    "sortOrder": 0
+  },
+  {
+    "id": "miniapp-host-sync-online",
+    "name": "同步线上包版本",
+    "icon": "terminal",
+    "description": "同步上线系统 MPS 包配置到 miniapp-host 的 mps-config",
+    "type": "shell",
+    "command": "zsh -lc \"pnpm run start:sync-dev {{miniapp}}\"",
+    "workingDir": "~/work/brain/projects/miniapp-host/code",
+    "params": [
+      {
+        "name": "miniapp",
+        "label": "小程序宿主",
+        "type": "select",
+        "required": true,
+        "default": "anjuke_weapp",
+        "options": [
+          { "value": "anjuke_weapp", "label": "安居客微信" },
+          { "value": "anjuke_weapp_plugin", "label": "安居客微信插件" },
+          { "value": "anjuke_alipay", "label": "安居客支付宝" },
+          { "value": "anjuke_swan", "label": "安居客百度" },
+          { "value": "anjuke_tt", "label": "安居客抖音" },
+          { "value": "anjuke_kwai", "label": "安居客快手" },
+          { "value": "wuba_weapp", "label": "58房产微信" },
+          { "value": "tongcheng_weapp", "label": "58同城微信" }
+        ]
+      }
+    ],
+    "enabled": true,
+    "timeoutMs": 600000,
+    "sortOrder": 0
+  },
+  {
+    "id": "miniapp-host-open-devtools",
+    "name": "打开小程序开发工具",
+    "icon": "folder-open",
+    "description": "打开指定小程序宿主对应的开发者工具",
+    "type": "shell",
+    "command": "zsh -lc \"pnpm run open {{miniapp}}\"",
+    "workingDir": "~/work/brain/projects/miniapp-host/code",
+    "params": [
+      {
+        "name": "miniapp",
+        "label": "小程序宿主",
+        "type": "select",
+        "required": true,
+        "default": "anjuke_weapp",
+        "options": [
+          { "value": "anjuke_weapp", "label": "安居客微信" },
+          { "value": "anjuke_weapp_plugin", "label": "安居客微信插件" },
+          { "value": "anjuke_alipay", "label": "安居客支付宝" },
+          { "value": "anjuke_swan", "label": "安居客百度" },
+          { "value": "anjuke_tt", "label": "安居客抖音" },
+          { "value": "anjuke_kwai", "label": "安居客快手" },
+          { "value": "wuba_weapp", "label": "58房产微信" },
+          { "value": "tongcheng_weapp", "label": "58同城微信" }
+        ]
+      }
+    ],
+    "enabled": true,
+    "timeoutMs": 300000,
+    "sortOrder": 0
+  },
+  {
     "id": "open-brain",
     "name": "打开 Brain 项目",
     "icon": "folder-open",

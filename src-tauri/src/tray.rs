@@ -20,6 +20,8 @@ struct ToolForTray {
     name: String,
     #[serde(rename = "type")]
     tool_type: String,
+    #[serde(default)]
+    params: Vec<serde_json::Value>,
     enabled: Option<bool>,
 }
 
@@ -78,7 +80,8 @@ fn build_tools_submenu<R: tauri::Runtime>(
     let mut builder = SubmenuBuilder::new(app, &menu_label);
 
     if tools.is_empty() {
-        let disabled_item = MenuItem::with_id(app, "no-tools", "（无可用工具）", false, None::<&str>)?;
+        let disabled_item =
+            MenuItem::with_id(app, "no-tools", "（无可用工具）", false, None::<&str>)?;
         builder = builder.item(&disabled_item);
     } else {
         for tool in tools {
@@ -116,6 +119,15 @@ fn load_tools_from_json() -> Vec<ToolForTray> {
     }
 }
 
+/// 无参数工具可从托盘直接执行；有参数工具才需要打开参数弹窗。
+pub fn tool_needs_param_dialog(tool_id: &str) -> bool {
+    load_tools_from_json()
+        .into_iter()
+        .find(|tool| tool.id == tool_id)
+        .map(|tool| !tool.params.is_empty())
+        .unwrap_or(true)
+}
+
 fn expand_home(path: &str) -> std::path::PathBuf {
     if path.starts_with("~/") {
         if let Some(home) = dirs::home_dir() {
@@ -143,7 +155,10 @@ pub fn create_tray_menu<R: tauri::Runtime>(
     // Group tools by type
     let mut grouped: HashMap<&str, Vec<ToolForTray>> = HashMap::new();
     for tool in &tools {
-        grouped.entry(&tool.tool_type).or_default().push(tool.clone());
+        grouped
+            .entry(&tool.tool_type)
+            .or_default()
+            .push(tool.clone());
     }
 
     // Warn about tools with unknown types that won't appear in the tray menu
@@ -211,14 +226,20 @@ pub fn handle_tray_menu_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: 
         _ => {
             // Handle tool clicks: "tool:{tool_id}"
             if let Some(tool_id) = id.strip_prefix("tool:") {
-                // Show and focus the main window first, then open the param dialog.
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.unminimize();
-                    let _ = window.show();
-                    let _ = window.set_focus();
+                if tool_needs_param_dialog(tool_id) {
+                    // Show and focus the main window first, then open the param dialog.
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.unminimize();
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                    let payload = serde_json::json!({ "toolId": tool_id });
+                    let _ = app.emit("open_param_dialog", payload);
+                } else {
+                    log::debug!(
+                        "Ignoring direct tray execution in generic handler for tool {tool_id}"
+                    );
                 }
-                let payload = serde_json::json!({ "toolId": tool_id });
-                let _ = app.emit("open_param_dialog", payload);
             }
         }
     }
@@ -253,7 +274,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(target_os = "macos", ignore = "muda MenuChild requires main thread on macOS")]
+    #[cfg_attr(
+        target_os = "macos",
+        ignore = "muda MenuChild requires main thread on macOS"
+    )]
     fn test_build_tools_submenu_multiple_tools() {
         let app = tauri::test::mock_app();
         let app_handle = app.handle();
@@ -263,18 +287,29 @@ mod tests {
         ];
 
         let result = build_tools_submenu(&app_handle, "shell", "Shell 工具", "🔧", &tools);
-        assert!(result.is_ok(), "should build submenu with multiple tools: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "should build submenu with multiple tools: {:?}",
+            result.err()
+        );
     }
 
     #[test]
-    #[cfg_attr(target_os = "macos", ignore = "muda MenuChild requires main thread on macOS")]
+    #[cfg_attr(
+        target_os = "macos",
+        ignore = "muda MenuChild requires main thread on macOS"
+    )]
     fn test_build_tools_submenu_empty() {
         let app = tauri::test::mock_app();
         let app_handle = app.handle();
         let tools: Vec<ToolForTray> = vec![];
 
         let result = build_tools_submenu(&app_handle, "shell", "Shell 工具", "🔧", &tools);
-        assert!(result.is_ok(), "should build submenu with disabled placeholder: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "should build submenu with disabled placeholder: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -321,7 +356,10 @@ mod tests {
         let type_keys: Vec<&str> = ToolTypeMenu::ALL.iter().map(|m| m.type_key).collect();
         assert!(type_keys.contains(&"shell"), "ALL should contain 'shell'");
         assert!(type_keys.contains(&"open"), "ALL should contain 'open'");
-        assert!(type_keys.contains(&"notification"), "ALL should contain 'notification'");
+        assert!(
+            type_keys.contains(&"notification"),
+            "ALL should contain 'notification'"
+        );
         assert_eq!(type_keys.len(), 3, "ALL should have exactly 3 entries");
     }
 }

@@ -6,9 +6,9 @@ mod config;
 mod database;
 mod error;
 mod init_status;
-mod panic_hook;
 #[cfg(target_os = "linux")]
 mod linux_fix;
+mod panic_hook;
 mod services;
 mod settings;
 mod store;
@@ -23,12 +23,81 @@ pub use error::AppError;
 pub use settings::{update_settings, AppSettings};
 pub use store::AppState;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 #[cfg(target_os = "macos")]
 use tauri::image::Image;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::RunEvent;
 use tauri::{Emitter, Manager};
+
+const TOOLS_JSON_PATH: &str = "~/work/quicktools/tools.json";
+
+async fn execute_tool_from_tray(app: tauri::AppHandle, tool_id: String) {
+    use crate::database::{ExecutionLog, LogDao, ToolDao};
+    use crate::services::{Executor, Notifier};
+
+    let state = app.state::<AppState>();
+    let path = crate::services::executor::expand_home(TOOLS_JSON_PATH);
+
+    let tool = match state.db.with_tools_dao(|conn| {
+        ToolDao::load_from_file(conn, &path)
+            .map_err(|err| crate::AppError::Message(err.to_string()))?;
+        ToolDao::get(conn, &tool_id)
+            .map_err(crate::AppError::from)?
+            .ok_or_else(|| crate::AppError::Message(format!("Tool not found: {tool_id}")))
+    }) {
+        Ok(tool) => tool,
+        Err(err) => {
+            log::error!("托盘工具加载失败: {err}");
+            return;
+        }
+    };
+
+    let params = HashMap::new();
+    let result = match Executor::execute(&tool, &params, &app).await {
+        Ok(result) => result,
+        Err(err) => {
+            log::error!("托盘工具执行失败: {err}");
+            return;
+        }
+    };
+
+    let params_json = match serde_json::to_string(&result.params) {
+        Ok(params_json) => params_json,
+        Err(err) => {
+            log::error!("托盘工具参数序列化失败: {err}");
+            return;
+        }
+    };
+
+    let log = ExecutionLog {
+        id: result.id.clone(),
+        tool_id: result.tool_id.clone(),
+        tool_name: result.tool_name.clone(),
+        params: params_json,
+        status: result.status.clone(),
+        duration_ms: result.duration,
+        exit_code: result.exit_code.map(i64::from),
+        stdout: result.stdout.clone(),
+        stderr: result.stderr.clone(),
+        error: result.error.clone(),
+        executed_at: chrono::Utc::now().to_rfc3339(),
+    };
+
+    if let Err(err) = state
+        .db
+        .with_logs_dao(|conn| LogDao::insert(conn, &log).map_err(Into::into))
+    {
+        log::error!("托盘工具执行日志写入失败: {err}");
+    }
+
+    if let Err(err) =
+        Notifier::notify_execution(&app, &result.tool_name, &result.status, result.duration)
+    {
+        log::warn!("托盘工具通知发送失败: {err}");
+    }
+}
 
 /// 更新托盘菜单的Tauri命令
 #[tauri::command]
@@ -260,11 +329,9 @@ pub fn run() {
 
             // 构建托盘
             let mut tray_builder = TrayIconBuilder::with_id("main")
-                .on_tray_icon_event(|_tray, event| {
-                    match event {
-                        TrayIconEvent::Click { .. } => {}
-                        _ => log::debug!("unhandled tray icon event {event:?}"),
-                    }
+                .on_tray_icon_event(|_tray, event| match event {
+                    TrayIconEvent::Click { .. } => {}
+                    _ => log::debug!("unhandled tray icon event {event:?}"),
                 })
                 .menu(&menu)
                 .on_menu_event(|app, event| {
@@ -274,15 +341,30 @@ pub fn run() {
                         return;
                     }
                     if id == "show" || id.starts_with("tool:") {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.unminimize();
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                        if id == "show" {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.unminimize();
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
                         }
                     }
                     if let Some(tool_id) = id.strip_prefix("tool:") {
-                        let payload = serde_json::json!({ "toolId": tool_id });
-                        let _ = app.emit("open_param_dialog", payload);
+                        if tray::tool_needs_param_dialog(tool_id) {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.unminimize();
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                            let payload = serde_json::json!({ "toolId": tool_id });
+                            let _ = app.emit("open_param_dialog", payload);
+                        } else {
+                            let app_handle = app.clone();
+                            let tool_id = tool_id.to_string();
+                            tauri::async_runtime::spawn(async move {
+                                execute_tool_from_tray(app_handle, tool_id).await;
+                            });
+                        }
                     }
                 })
                 .show_menu_on_left_click(true);
@@ -337,10 +419,13 @@ pub fn run() {
             {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.with_webview(|webview| {
-                        use webkit2gtk::{WebViewExt, SettingsExt, HardwareAccelerationPolicy};
+                        use webkit2gtk::{HardwareAccelerationPolicy, SettingsExt, WebViewExt};
                         let wk_webview = webview.inner();
                         if let Some(settings) = WebViewExt::settings(&wk_webview) {
-                            SettingsExt::set_hardware_acceleration_policy(&settings, HardwareAccelerationPolicy::Never);
+                            SettingsExt::set_hardware_acceleration_policy(
+                                &settings,
+                                HardwareAccelerationPolicy::Never,
+                            );
                             log::info!("已禁用 WebKitGTK 硬件加速");
                         }
                     });

@@ -17,7 +17,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Tool, ExecutionResult } from "@/types/tool";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Tool, ToolParam, ExecutionResult } from "@/types/tool";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   terminal: Terminal,
@@ -40,11 +47,15 @@ export function ToolCard({ tool, onExecute, executing, result }: ToolCardProps) 
   const IconComponent = iconMap[tool.icon] || Terminal;
 
   const handleExecute = () => {
-    onExecute(tool.id, { ...getDefaultParams(tool), ...params });
+    onExecute(tool.id, getEffectiveParams(tool, params));
   };
 
   const hasParams = tool.params.length > 0;
   const isRunning = executing && result?.toolId === tool.id;
+  const isMissingRequired = tool.params.some((param) => {
+    if (!param.required) return false;
+    return !getEffectiveParams(tool, params)[param.name];
+  });
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -87,14 +98,12 @@ export function ToolCard({ tool, onExecute, executing, result }: ToolCardProps) 
                   {param.label}
                   {param.required && " *"}
                 </label>
-                <input
-                  type={param.type === "number" ? "number" : "text"}
-                  className="w-full mt-1 px-3 py-2 text-sm border rounded-md bg-background"
-                  value={params[param.name] || ""}
-                  onChange={(e) =>
-                    setParams((p) => ({ ...p, [param.name]: e.target.value }))
+                <ToolParamField
+                  param={param}
+                  value={params[param.name] ?? getDefaultParamValue(param)}
+                  onChange={(value) =>
+                    setParams((prev) => ({ ...prev, [param.name]: value }))
                   }
-                  placeholder={param.label}
                 />
               </div>
             ))}
@@ -107,7 +116,7 @@ export function ToolCard({ tool, onExecute, executing, result }: ToolCardProps) 
           <Button
             size="sm"
             onClick={handleExecute}
-            disabled={isRunning || (hasParams && !params[tool.params[0]?.name])}
+            disabled={isRunning || isMissingRequired}
           >
             {isRunning ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -122,13 +131,63 @@ export function ToolCard({ tool, onExecute, executing, result }: ToolCardProps) 
   );
 }
 
+interface ToolParamFieldProps {
+  param: ToolParam;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function ToolParamField({ param, value, onChange }: ToolParamFieldProps) {
+  if (param.type === "select") {
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="mt-1">
+          <SelectValue placeholder={param.label} />
+        </SelectTrigger>
+        <SelectContent>
+          {param.options?.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  return (
+    <input
+      type={param.type === "number" ? "number" : "text"}
+      className="w-full mt-1 px-3 py-2 text-sm border rounded-md bg-background"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={param.label}
+    />
+  );
+}
+
+function getDefaultParamValue(param: ToolParam): string {
+  if (param.default !== undefined && param.default !== null) {
+    return String(param.default);
+  }
+  return "";
+}
+
 function getDefaultParams(tool: Tool): Record<string, string> {
   return tool.params.reduce<Record<string, string>>((defaults, param) => {
-    if (param.default !== undefined && param.default !== null) {
-      defaults[param.name] = String(param.default);
+    const defaultValue = getDefaultParamValue(param);
+    if (defaultValue) {
+      defaults[param.name] = defaultValue;
     }
     return defaults;
   }, {});
+}
+
+function getEffectiveParams(
+  tool: Tool,
+  params: Record<string, string>
+): Record<string, string> {
+  return { ...getDefaultParams(tool), ...params };
 }
 
 interface ToolListProps {
