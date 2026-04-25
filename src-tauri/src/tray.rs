@@ -2,10 +2,8 @@
 //!
 //! 负责系统托盘图标和菜单的创建、更新和事件处理。
 
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
-use tauri::menu::{Menu, MenuBuilder, MenuItem, Submenu, SubmenuBuilder};
+use tauri::menu::{Menu, MenuBuilder, MenuItem};
 use tauri::{Emitter, Manager};
 
 use crate::store::AppState;
@@ -25,33 +23,6 @@ struct ToolForTray {
     enabled: Option<bool>,
 }
 
-/// 工具类型的菜单元数据
-struct ToolTypeMenu {
-    type_key: &'static str,
-    label: &'static str,
-    icon: &'static str,
-}
-
-impl ToolTypeMenu {
-    const ALL: [ToolTypeMenu; 3] = [
-        ToolTypeMenu {
-            type_key: "shell",
-            label: "Shell 工具",
-            icon: "🔧",
-        },
-        ToolTypeMenu {
-            type_key: "open",
-            label: "Open 工具",
-            icon: "📂",
-        },
-        ToolTypeMenu {
-            type_key: "notification",
-            label: "Notification 工具",
-            icon: "🔔",
-        },
-    ];
-}
-
 /// 托盘菜单文本（国际化）
 #[derive(Clone, Copy)]
 pub struct TrayTexts {
@@ -68,37 +39,30 @@ impl TrayTexts {
     }
 }
 
-/// 构建工具子菜单
-fn build_tools_submenu<R: tauri::Runtime>(
+fn tool_menu_item<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-    _type_key: &str,
-    label: &str,
-    icon: &str,
-    tools: &[ToolForTray],
-) -> Result<Submenu<R>, crate::error::AppError> {
-    let menu_label = format!("{icon} {label}");
-    let mut builder = SubmenuBuilder::new(app, &menu_label);
+    tool: &ToolForTray,
+) -> Result<MenuItem<R>, crate::error::AppError> {
+    let item_id = format!("tool:{}", tool.id);
+    Ok(MenuItem::with_id(
+        app,
+        &item_id,
+        &tool.name,
+        true,
+        None::<&str>,
+    )?)
+}
 
-    if tools.is_empty() {
-        let disabled_item =
-            MenuItem::with_id(app, "no-tools", "（无可用工具）", false, None::<&str>)?;
-        builder = builder.item(&disabled_item);
-    } else {
-        for tool in tools {
-            let item_id = format!("tool:{}", tool.id);
-            builder = builder.item(&MenuItem::with_id(
-                app,
-                &item_id,
-                &tool.name,
-                true,
-                None::<&str>,
-            )?);
-        }
-    }
-
-    builder
-        .build()
-        .map_err(|e| crate::error::AppError::Message(e.to_string()))
+fn no_tools_menu_item<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<MenuItem<R>, crate::error::AppError> {
+    Ok(MenuItem::with_id(
+        app,
+        "no-tools",
+        "（无可用工具）",
+        false,
+        None::<&str>,
+    )?)
 }
 
 /// 从 tools.json 直接加载工具（跳过数据库，启动时数据库可能还是空的）
@@ -152,30 +116,6 @@ pub fn create_tray_menu<R: tauri::Runtime>(
         .filter(|t| t.enabled.unwrap_or(true))
         .collect();
 
-    // Group tools by type
-    let mut grouped: HashMap<&str, Vec<ToolForTray>> = HashMap::new();
-    for tool in &tools {
-        grouped
-            .entry(&tool.tool_type)
-            .or_default()
-            .push(tool.clone());
-    }
-
-    // Warn about tools with unknown types that won't appear in the tray menu
-    for type_key in grouped.keys() {
-        if !ToolTypeMenu::ALL.iter().any(|m| m.type_key == *type_key) {
-            log::warn!(
-                "Unknown tool type '{}' for tool '{}', skipping tray menu item",
-                type_key,
-                grouped[type_key]
-                    .iter()
-                    .map(|t| t.id.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-        }
-    }
-
     let mut builder = MenuBuilder::new(app);
     builder = builder.item(&MenuItem::with_id(
         app,
@@ -185,17 +125,11 @@ pub fn create_tray_menu<R: tauri::Runtime>(
         None::<&str>,
     )?);
 
-    // Add submenus for each known tool type
-    for type_meta in ToolTypeMenu::ALL {
-        if let Some(type_tools) = grouped.get(type_meta.type_key) {
-            let submenu = build_tools_submenu(
-                app,
-                type_meta.type_key,
-                type_meta.label,
-                type_meta.icon,
-                type_tools,
-            )?;
-            builder = builder.item(&submenu);
+    if tools.is_empty() {
+        builder = builder.item(&no_tools_menu_item(app)?);
+    } else {
+        for tool in &tools {
+            builder = builder.item(&tool_menu_item(app, tool)?);
         }
     }
 
@@ -269,6 +203,7 @@ mod tests {
             id: id.to_string(),
             name: name.to_string(),
             tool_type: tool_type.to_string(),
+            params: vec![],
             enabled: Some(true),
         }
     }
@@ -278,18 +213,15 @@ mod tests {
         target_os = "macos",
         ignore = "muda MenuChild requires main thread on macOS"
     )]
-    fn test_build_tools_submenu_multiple_tools() {
+    fn test_tool_menu_item() {
         let app = tauri::test::mock_app();
         let app_handle = app.handle();
-        let tools = vec![
-            make_tool("shell-echo", "Echo", "shell"),
-            make_tool("shell-date", "Date", "shell"),
-        ];
+        let tool = make_tool("shell-echo", "Echo", "shell");
 
-        let result = build_tools_submenu(&app_handle, "shell", "Shell 工具", "🔧", &tools);
+        let result = tool_menu_item(&app_handle, &tool);
         assert!(
             result.is_ok(),
-            "should build submenu with multiple tools: {:?}",
+            "should build tool menu item: {:?}",
             result.err()
         );
     }
@@ -299,15 +231,14 @@ mod tests {
         target_os = "macos",
         ignore = "muda MenuChild requires main thread on macOS"
     )]
-    fn test_build_tools_submenu_empty() {
+    fn test_no_tools_menu_item() {
         let app = tauri::test::mock_app();
         let app_handle = app.handle();
-        let tools: Vec<ToolForTray> = vec![];
 
-        let result = build_tools_submenu(&app_handle, "shell", "Shell 工具", "🔧", &tools);
+        let result = no_tools_menu_item(&app_handle);
         assert!(
             result.is_ok(),
-            "should build submenu with disabled placeholder: {:?}",
+            "should build disabled placeholder: {:?}",
             result.err()
         );
     }
@@ -352,14 +283,16 @@ mod tests {
     }
 
     #[test]
-    fn test_tool_type_menu_all_has_expected_types() {
-        let type_keys: Vec<&str> = ToolTypeMenu::ALL.iter().map(|m| m.type_key).collect();
-        assert!(type_keys.contains(&"shell"), "ALL should contain 'shell'");
-        assert!(type_keys.contains(&"open"), "ALL should contain 'open'");
+    fn test_tool_menu_item_accepts_any_tool_type() {
+        let app = tauri::test::mock_app();
+        let app_handle = app.handle();
+        let tool = make_tool("custom-tool", "Custom", "custom");
+
+        let result = tool_menu_item(&app_handle, &tool);
         assert!(
-            type_keys.contains(&"notification"),
-            "ALL should contain 'notification'"
+            result.is_ok(),
+            "flat tray menu should accept any enabled tool type: {:?}",
+            result.err()
         );
-        assert_eq!(type_keys.len(), 3, "ALL should have exactly 3 entries");
     }
 }
