@@ -62,7 +62,7 @@
     "id": "replace-p7b",
     "name": "Replace P7B",
     "icon": "file-code",
-    "description": "替换 harmonyajkproject 的 debug p7b 签名文件并提交推送",
+    "description": "通过 GitLab CLI 远程替换 harmonyajkproject 的 debug p7b 签名文件",
     "type": "shell",
     "command": "bash scripts/replace-p7b.sh {{sourceP7b}} {{branch}}",
     "workingDir": "~/work/quicktools",

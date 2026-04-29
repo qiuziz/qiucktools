@@ -11,11 +11,9 @@
 #   branch      目标分支（默认: 最新 release 分支，如 release-17.36）
 #
 # 流程:
-#   1. 检查目标目录是否存在，不存在则从 git clone
-#   2. 切换到目标分支
-#   3. 备份原文件（*.p7b.bak）
-#   4. 替换文件
-#   5. git add + commit + push
+#   1. 通过 glab 读取远程文件信息
+#   2. 对比源文件与远程文件 sha256
+#   3. 内容变化时直接调用 GitLab Repository Files API 提交更新
 
 set -e
 
@@ -23,21 +21,105 @@ SOURCE_P7B="${1:-}"
 BRANCH="${2:-}"
 
 # ---------- 固定配置 ----------
-readonly PROJECT_NAME="harmonyajkproject"
-readonly GIT_URL="git@igit.58corp.com:_fe/harmonyajkproject.git"
-readonly GIT_DIR="/Users/qiuz/work/AJK/harmony/$PROJECT_NAME"
-readonly TARGET_FILE="$GIT_DIR/config/debugSign/ajk-hap-debug.p7b"
+readonly GITLAB_HOST="igit.58corp.com"
+readonly GITLAB_PROJECT="_fe%2Fharmonyajkproject"
+readonly REPO_FILE="config/debugSign/ajk-hap-debug.p7b"
 readonly COMMIT_MSG="chore: replace ajk-hap-debug.p7b"
 # ------------------------------
+
+require_cmd() {
+    local cmd="$1"
+    if ! command -v "$cmd" > /dev/null 2>&1; then
+        echo "错误: 缺少命令 $cmd"
+        exit 1
+    fi
+}
+
+url_encode() {
+    jq -rn --arg v "$1" '$v|@uri'
+}
 
 # 获取最新 release 分支（按版本号降序排列，取第一个）
 get_latest_release_branch() {
     local branches
-    branches=$(git ls-remote --heads "$GIT_URL" 2>/dev/null | awk -F'/' '{print $NF}' | grep '^release-' | sort -t'.' -k1,1n -k2,2n -k3,3n | tail -1)
+    require_cmd glab
+    require_cmd jq
+
+    branches=$(glab api --hostname "$GITLAB_HOST" "projects/${GITLAB_PROJECT}/repository/branches?search=^release-&per_page=100" --paginate 2>/dev/null \
+        | jq -r '.[].name' \
+        | grep '^release-' \
+        | sort -t'.' -k1,1n -k2,2n -k3,3n \
+        | tail -1)
+
     if [[ -z "$branches" ]]; then
         echo "release-17.36"  # fallback
     else
         echo "$branches"
+    fi
+}
+
+replace_with_glab() {
+    require_cmd glab
+    require_cmd jq
+    require_cmd base64
+    require_cmd shasum
+
+    local file_encoded
+    local branch_encoded
+    local remote_json
+    local remote_sha
+    local remote_size
+    local new_size
+    local new_sha
+    local content
+    local response
+    local commit_id
+
+    file_encoded=$(url_encode "$REPO_FILE")
+    branch_encoded=$(url_encode "$BRANCH")
+
+    echo "检查远程文件..."
+
+    if ! remote_json=$(glab api --hostname "$GITLAB_HOST" "projects/${GITLAB_PROJECT}/repository/files/${file_encoded}?ref=${branch_encoded}"); then
+        echo "错误: 无法读取远程文件 ${REPO_FILE}（分支: ${BRANCH}）"
+        exit 1
+    fi
+
+    remote_sha=$(jq -r '.content_sha256 // empty' <<< "$remote_json")
+    remote_size=$(jq -r '.size // "unknown"' <<< "$remote_json")
+    new_size=$(stat -f%z "$SOURCE_P7B" 2>/dev/null || stat -c%s "$SOURCE_P7B" 2>/dev/null || echo "unknown")
+    new_sha=$(shasum -a 256 "$SOURCE_P7B" | awk '{print $1}')
+
+    echo ""
+    echo "=== 开始替换签名文件（GitLab CLI） ==="
+    echo "源文件:   $SOURCE_P7B"
+    echo "目标文件: $REPO_FILE"
+    echo "分支:     $BRANCH"
+    echo "原文件:   $remote_size bytes"
+    echo "新文件:   $new_size bytes"
+
+    if [[ -n "$remote_sha" ]] && [[ "$remote_sha" == "$new_sha" ]]; then
+        echo ""
+        echo "警告: 文件内容未变化，跳过提交"
+        exit 0
+    fi
+
+    content=$(base64 < "$SOURCE_P7B" | tr -d '\n')
+
+    echo ""
+    echo "提交远程变更..."
+    response=$(glab api --hostname "$GITLAB_HOST" --method PUT "projects/${GITLAB_PROJECT}/repository/files/${file_encoded}" \
+        -f "branch=${BRANCH}" \
+        -f "commit_message=${COMMIT_MSG}" \
+        -f "content=${content}" \
+        -f "encoding=base64")
+
+    commit_id=$(jq -r '.commit_id // empty' <<< "$response")
+    echo ""
+    echo "=== 完成 ==="
+    echo "分支: $BRANCH"
+    if [[ -n "$commit_id" ]]; then
+        echo "提交: ${commit_id:0:8}"
     fi
 }
 
@@ -46,13 +128,6 @@ if [[ "$SOURCE_P7B" == ~/* ]]; then
     SOURCE_P7B="${HOME}/${SOURCE_P7B:2}"
 elif [[ "$SOURCE_P7B" == "~" ]]; then
     SOURCE_P7B="$HOME"
-fi
-
-# 解析 branch 参数
-if [[ -z "$BRANCH" ]]; then
-    echo "未指定分支，自动获取最新 release 分支..."
-    BRANCH=$(get_latest_release_branch)
-    echo "最新 release 分支: $BRANCH"
 fi
 
 # 校验参数
@@ -75,98 +150,11 @@ if [[ ! -f "$SOURCE_P7B" ]]; then
     exit 1
 fi
 
-# ---------- 中断清理 ----------
-cleanup() {
-    if [[ "$NEED_CLEANUP" == true ]] && [[ -d "$GIT_DIR" ]]; then
-        echo ""
-        echo "中断：清理临时克隆目录..."
-        rm -rf "$GIT_DIR"
-        echo "已删除: $GIT_DIR"
-    fi
-    rm -f "${TARGET_FILE}.bak"
-}
-trap cleanup EXIT INT TERM
-
-# ---------- 检查/克隆项目 ----------
-NEED_CLEANUP=false
-if [[ ! -d "$GIT_DIR" ]]; then
-    echo "目标目录不存在: $GIT_DIR"
-    echo "从远程克隆..."
-    git clone "$GIT_URL" "$GIT_DIR"
-    echo "克隆完成"
-    NEED_CLEANUP=true
+# 解析 branch 参数
+if [[ -z "$BRANCH" ]]; then
+    echo "未指定分支，自动获取最新 release 分支..."
+    BRANCH=$(get_latest_release_branch)
+    echo "最新 release 分支: $BRANCH"
 fi
 
-# 切换到目标目录
-cd "$GIT_DIR"
-
-# 检查 git 状态
-if ! git rev-parse --git-dir > /dev/null 2>&1; then
-    echo "错误: $GIT_DIR 不是 git 仓库"
-    exit 1
-fi
-
-# 拉取最新分支列表
-echo "更新远程分支列表..."
-git fetch origin > /dev/null 2>&1
-
-# 检查分支是否存在，不存在则创建
-if ! git rev-parse --verify "$BRANCH" > /dev/null 2>&1; then
-    echo "本地分支 $BRANCH 不存在，创建并切换..."
-    git checkout -b "$BRANCH" "origin/$BRANCH" 2>/dev/null || {
-        echo "错误: 远程分支 origin/$BRANCH 不存在"
-        exit 1
-    }
-else
-    git checkout "$BRANCH"
-fi
-
-# 拉取最新代码
-echo "拉取最新代码..."
-git pull origin "$BRANCH" --ff > /dev/null 2>&1 || echo "（拉取可能失败，如有问题请手动检查）"
-
-# ---------- 替换文件 ----------
-ORIG_SIZE=$(stat -f%z "$TARGET_FILE" 2>/dev/null || stat -c%s "$TARGET_FILE" 2>/dev/null || echo "unknown")
-NEW_SIZE=$(stat -f%z "$SOURCE_P7B" 2>/dev/null || stat -c%s "$SOURCE_P7B" 2>/dev/null || echo "unknown")
-
-echo ""
-echo "=== 开始替换签名文件 ==="
-echo "源文件:   $SOURCE_P7B"
-echo "目标文件: $TARGET_FILE"
-echo "分支:     $BRANCH"
-echo "原文件:   $ORIG_SIZE bytes"
-echo "新文件:   $NEW_SIZE bytes"
-
-# 备份原文件
-cp "$TARGET_FILE" "${TARGET_FILE}.bak"
-echo "已备份原文件到: ${TARGET_FILE}.bak"
-
-# 替换文件
-cp "$SOURCE_P7B" "$TARGET_FILE"
-echo "文件替换完成"
-
-# 检查 git diff（Binary files 没有 insertions/deletions 统计，用 --quiet 判断）
-if git diff --quiet config/debugSign/ajk-hap-debug.p7b; then
-    echo ""
-    echo "警告: 文件内容未变化，跳过提交"
-    exit 0
-fi
-
-# git add
-git add config/debugSign/ajk-hap-debug.p7b
-
-# git commit
-echo ""
-echo "提交变更..."
-git commit -m "$COMMIT_MSG"
-COMMIT_HASH=$(git rev-parse --short HEAD)
-echo "已提交: $COMMIT_HASH"
-
-# git push
-echo ""
-echo "推送到远程..."
-git push origin "$BRANCH"
-echo ""
-echo "=== 完成 ==="
-echo "分支: $BRANCH"
-echo "提交: $COMMIT_HASH"
+replace_with_glab
