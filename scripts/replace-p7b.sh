@@ -1,6 +1,7 @@
 #!/bin/bash
 # replace-p7b.sh - 替换 harmonyajkproject 中的签名文件并提交
 # 用法: ./replace-p7b.sh <source_p7b> [branch]
+# 或者: ./replace-p7b.sh [key value]... （key-value 模式，由 QuickTools executor 调用）
 #
 # 示例:
 #   ./replace-p7b.sh ~/Downloads/app/ajk-harmony-debugDebug\(1\).p7b
@@ -17,8 +18,31 @@
 
 set -e
 
-SOURCE_P7B="${1:-}"
-BRANCH="${2:-}"
+# QuickTools GUI 启动时不继承 shell PATH，需显式补充
+export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/bin:$HOME/.local/bin:$PATH"
+
+# 解析参数：支持两种模式
+# 1. 传统模式: $1=path, $2=branch
+# 2. Key-value 模式: $1=key1, $2=val1, $3=key2, $4=val2, ...
+# 判断方式：如果第一个参数是已知的 key 名，则是 kv 模式
+parse_args() {
+    if [[ $# -ge 2 ]] && [[ "$1" == "sourceP7b" || "$1" == "branch" ]]; then
+        # Key-value 模式
+        while [[ $# -ge 2 ]]; do
+            case "$1" in
+                sourceP7b) SOURCE_P7B="$2" ;;
+                branch) BRANCH="$2" ;;
+            esac
+            shift 2
+        done
+    else
+        # 传统模式
+        SOURCE_P7B="${1:-}"
+        BRANCH="${2:-}"
+    fi
+}
+
+parse_args "$@"
 
 # ---------- 固定配置 ----------
 readonly GITLAB_HOST="igit.58corp.com"
@@ -124,7 +148,8 @@ replace_with_glab() {
 }
 
 # 展开 ~（不用 eval，避免路径含特殊字符时出错）
-if [[ "$SOURCE_P7B" == ~/* ]]; then
+# 注意：Rust executor 已对参数值做 tilde 展开，此处处理直接调用脚本的场景
+if [[ "${SOURCE_P7B:0:2}" == "~/" ]]; then
     SOURCE_P7B="${HOME}/${SOURCE_P7B:2}"
 elif [[ "$SOURCE_P7B" == "~" ]]; then
     SOURCE_P7B="$HOME"
@@ -139,7 +164,7 @@ if [[ -z "$SOURCE_P7B" ]]; then
     echo "  branch      目标分支（默认: 自动获取最新 release 分支）"
     echo ""
     echo "示例:"
-    echo "  $0 ~/Downloads/app/ajk-harmony-debugDebug\(1\).p7b"
+    echo "  $0 ~/Downloads/app/ajk-harmony-debugDebug\\(1\\).p7b"
     echo "  $0 ~/Downloads/app/ajk-hap-debug.p7b release-17.36"
     exit 1
 fi
@@ -150,8 +175,8 @@ if [[ ! -f "$SOURCE_P7B" ]]; then
     exit 1
 fi
 
-# 解析 branch 参数
-if [[ -z "$BRANCH" ]]; then
+# 解析 branch 参数（忽略空字符串和 literal "''"，由脚本自动获取最新 release 分支）
+if [[ -z "$BRANCH" ]] || [[ "$BRANCH" == "''" ]]; then
     echo "未指定分支，自动获取最新 release 分支..."
     BRANCH=$(get_latest_release_branch)
     echo "最新 release 分支: $BRANCH"

@@ -45,6 +45,8 @@ impl Executor {
         _app_handle: &AppHandle,
     ) -> Result<ExecutionResult, ExecutorError> {
         let command = substitute_params(&tool.command, params);
+        // Debug: write command to temp file
+        let _ = std::fs::write("/tmp/quicktools_cmd.txt", &command);
         let started_at = Instant::now();
 
         match tool.tool_type.as_str() {
@@ -188,7 +190,96 @@ pub fn expand_home(path: &str) -> String {
     path.to_string()
 }
 
+/// Build shell arguments with proper array-based approach to avoid quoting issues.
+/// For each key-value pair in params, appends the key and expanded/quoted value
+/// as separate arguments to the command. This avoids the quoting problems that
+/// occur when building a single -c string.
+fn build_shell_args(command: &str, params: &HashMap<String, String>) -> Result<Vec<String>, ExecutorError> {
+    let mut args = vec!["-c".to_string(), command.to_string()];
+    for (key, value) in params.iter() {
+        if !value.is_empty() {
+            let expanded = expand_home(value);
+            args.push(key.clone());
+            args.push(expanded);
+        }
+    }
+    Ok(args)
+}
+
+/// Execute params from build_shell_args, passing key-value pairs directly to the script.
+/// The script receives args via $1, $2, $3, etc. in order: key1, val1, key2, val2, ...
+async fn execute_with_params(
+    tool: &Tool,
+    params: &HashMap<String, String>,
+    started_at: Instant,
+) -> Result<ExecutionResult, ExecutorError> {
+    let mut args = vec!["-c".to_string(), tool.command.clone()];
+    for (key, value) in params.iter() {
+        if !value.is_empty() {
+            let expanded = expand_home(value);
+            args.push(key.clone());
+            args.push(expanded);
+        }
+    }
+
+    let mut command = tokio::process::Command::new("sh");
+    command.args(&args);
+    if let Some(dir) = normalize_working_dir(&tool.working_dir) {
+        command.current_dir(dir);
+    }
+
+    let timeout_duration = Duration::from_millis(tool.timeout_ms.max(1) as u64);
+    let output = match timeout(timeout_duration, command.output()).await {
+        Ok(result) => result?,
+        Err(_) => {
+            return Ok(ExecutionResult {
+                id: uuid::Uuid::new_v4().to_string(),
+                tool_id: tool.id.clone(),
+                tool_name: tool.name.clone(),
+                status: "timeout".to_string(),
+                duration: started_at.elapsed().as_millis() as i64,
+                exit_code: None,
+                stdout: String::new(),
+                stderr: String::new(),
+                error: Some(format!("Execution timed out after {}ms", tool.timeout_ms)),
+                params: params.clone(),
+            });
+        }
+    };
+
+    let duration = started_at.elapsed().as_millis() as i64;
+    let success = output.status.success();
+    let status = if success { "success" } else { "failed" };
+    let stdout = truncate_output(String::from_utf8_lossy(&output.stdout).into_owned());
+    let stderr = truncate_output(String::from_utf8_lossy(&output.stderr).into_owned());
+    let exit_code = output.status.code();
+    let error = if success {
+        None
+    } else {
+        Some(match exit_code {
+            Some(code) => format!("Process exited with code {code}"),
+            None => "Process terminated by signal".to_string(),
+        })
+    };
+
+    Ok(ExecutionResult {
+        id: uuid::Uuid::new_v4().to_string(),
+        tool_id: tool.id.clone(),
+        tool_name: tool.name.clone(),
+        status: status.to_string(),
+        duration,
+        exit_code,
+        stdout,
+        stderr,
+        error,
+        params: params.clone(),
+    })
+}
+
 fn shell_quote(value: &str) -> String {
+    if value.is_empty() {
+        return String::new();
+    }
     let escaped = value.replace('\'', "'\"'\"'");
     format!("'{escaped}'")
 }
@@ -196,7 +287,12 @@ fn shell_quote(value: &str) -> String {
 pub fn substitute_params(command: &str, params: &HashMap<String, String>) -> String {
     params.iter().fold(command.to_string(), |acc, (key, value)| {
         let placeholder = format!("{{{{{key}}}}}");
-        acc.replace(&placeholder, &shell_quote(value))
+        if value.is_empty() {
+            acc.replace(&placeholder, "")
+        } else {
+            let expanded_value = expand_home(value);
+            acc.replace(&placeholder, &shell_quote(&expanded_value))
+        }
     })
 }
 
@@ -241,6 +337,22 @@ mod tests {
         let result = substitute_params("echo {{name}} {{path}}", &params);
 
         assert_eq!(result, "echo 'hello world' 'a'\"'\"'b'");
+    }
+
+    #[test]
+    fn substitute_params_expands_tilde_in_values() {
+        let home = dirs::home_dir().expect("home dir should exist");
+        let params = HashMap::from([(
+            "path".to_string(),
+            "~/Downloads/app/aaa.p7b".to_string(),
+        )]);
+
+        let result = substitute_params("bash script.sh {{path}}", &params);
+
+        assert_eq!(
+            result,
+            format!("bash script.sh '{}'", home.join("Downloads/app/aaa.p7b").to_string_lossy())
+        );
     }
 
     #[test]

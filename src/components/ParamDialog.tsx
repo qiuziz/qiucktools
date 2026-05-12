@@ -49,7 +49,12 @@ export function ParamDialog({ toolId, onClose }: ParamDialogProps) {
               defaults[param.name] = String(param.default);
             }
           }
-          setFormValues(defaults);
+          // Clean any quoted values from defaults or previous saves
+          const cleaned: Record<string, string> = {};
+          for (const [k, v] of Object.entries(defaults)) {
+            cleaned[k] = cleanValue(v);
+          }
+          setFormValues(cleaned);
         }
       } catch {
         toast.error("Failed to load tool");
@@ -91,7 +96,17 @@ export function ParamDialog({ toolId, onClose }: ParamDialogProps) {
   };
 
   const handleValueChange = (name: string, value: string) => {
-    setFormValues((prev) => ({ ...prev, [name]: value }));
+    setFormValues((prev) => ({ ...prev, [name]: cleanValue(value) }));
+  };
+
+  // Strip outer single quotes that may have been left by manual copy-paste
+  // (e.g. user pastes a command-line quoted path like '/Users/...')
+  const cleanValue = (v: string) => {
+    const trimmed = v.trim();
+    if (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2) {
+      return trimmed.slice(1, -1);
+    }
+    return v;
   };
 
   if (loading || !tool) {
