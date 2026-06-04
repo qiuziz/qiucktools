@@ -473,6 +473,8 @@ pub fn run() {
             commands::load_tools,
             commands::execute_tool,
             commands::get_logs,
+            commands::harmony_branch_preview,
+            commands::harmony_branch_integrate,
             update_tray_menu,
         ]);
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Play,
@@ -10,7 +10,13 @@ import {
   MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import type { Tool, ToolParam, ExecutionResult } from "@/types/tool";
 
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   terminal: Terminal,
   "file-code": FileCode,
   "folder-open": FolderOpen,
@@ -58,17 +64,19 @@ export function ToolCard({ tool, onExecute, executing, result }: ToolCardProps) 
   });
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="group flex min-h-[172px] flex-col overflow-hidden border-border/80 bg-card/85 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.7)] backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-500/30 hover:bg-card hover:shadow-[0_20px_45px_-28px_rgba(10,132,255,0.55)] dark:bg-card/75">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
+          <div className="min-w-0 flex-1 flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/10 bg-gradient-to-br from-blue-500/15 to-blue-500/5 text-blue-500 shadow-inner shadow-white/60 dark:shadow-black/20">
               <IconComponent className="h-5 w-5 text-primary" />
             </div>
-            <div>
-              <CardTitle className="text-base">{tool.name}</CardTitle>
+            <div className="min-w-0 pt-0.5">
+              <CardTitle className="truncate text-base font-semibold tracking-tight">
+                {tool.name}
+              </CardTitle>
               {tool.description && (
-                <CardDescription className="text-xs mt-1">
+                <CardDescription className="mt-1 line-clamp-2 text-sm leading-5">
                   {tool.description}
                 </CardDescription>
               )}
@@ -76,7 +84,11 @@ export function ToolCard({ tool, onExecute, executing, result }: ToolCardProps) 
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground opacity-70 hover:opacity-100"
+              >
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -89,14 +101,16 @@ export function ToolCard({ tool, onExecute, executing, result }: ToolCardProps) 
           </DropdownMenu>
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="flex flex-1 flex-col pt-0">
         {hasParams && (
-          <div className="mb-3 space-y-2">
+          <div className="mb-4 grid gap-3">
             {tool.params.map((param) => (
               <div key={param.name}>
-                <label className="text-xs text-muted-foreground">
+                <label className="text-xs font-medium text-muted-foreground">
                   {param.label}
-                  {param.required && " *"}
+                  {param.required && (
+                    <span className="ml-0.5 text-blue-500">*</span>
+                  )}
                 </label>
                 <ToolParamField
                   param={param}
@@ -109,21 +123,22 @@ export function ToolCard({ tool, onExecute, executing, result }: ToolCardProps) 
             ))}
           </div>
         )}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground capitalize">
+        <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/70 pt-3">
+          <span className="inline-flex h-7 items-center rounded-md bg-muted/70 px-2 text-xs font-medium capitalize text-muted-foreground">
             {tool.type}
           </span>
           <Button
             size="sm"
             onClick={handleExecute}
             disabled={isRunning || isMissingRequired}
+            className="h-9 min-w-[116px] rounded-lg px-4 text-sm shadow-sm shadow-blue-500/20"
           >
             {isRunning ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
               <Play className="h-4 w-4 mr-2" />
             )}
-            {t("tools.execute")}
+            {t("tools.execute", "Run")}
           </Button>
         </div>
       </CardContent>
@@ -158,7 +173,7 @@ function ToolParamField({ param, value, onChange }: ToolParamFieldProps) {
   return (
     <input
       type={param.type === "number" ? "number" : "text"}
-      className="w-full mt-1 px-3 py-2 text-sm border rounded-md bg-background"
+      className="mt-1 h-10 w-full rounded-lg border border-input bg-background/80 px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-blue-500/70 focus:ring-2 focus:ring-blue-500/15"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={param.label}
@@ -236,7 +251,7 @@ export function ToolList({
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
       {tools.map((tool) => (
         <ToolCard
           key={tool.id}

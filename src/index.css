@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 210 20% 98%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
@@ -33,7 +33,7 @@
   }
 
   .dark {
-    --background: 240 5% 12%;
+    --background: 240 5% 10%;
     --foreground: 0 0% 98%;
     --card: 240 5% 16%;
     --card-foreground: 0 0% 98%;
@@ -100,17 +100,29 @@
 }
 
 .glass-header {
-  background: hsl(var(--background));
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border: none;
-  border-top: 2px solid hsl(var(--border));
+  background: hsl(var(--background) / 0.82);
+  backdrop-filter: blur(18px) saturate(1.25);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  border-bottom: 1px solid hsl(var(--border) / 0.85);
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.65) inset;
 }
 
 .dark .glass-header {
-  background: hsl(var(--background));
-  border: none;
-  border-top: 2px solid hsl(var(--border));
+  background: hsl(var(--background) / 0.78);
+  border-bottom: 1px solid hsl(var(--border) / 0.75);
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.06) inset;
+}
+
+.app-main-surface {
+  background:
+    radial-gradient(circle at 10% 0%, hsl(210 100% 56% / 0.08), transparent 28rem),
+    linear-gradient(180deg, hsl(var(--background)), hsl(220 20% 96%));
+}
+
+.dark .app-main-surface {
+  background:
+    radial-gradient(circle at 10% 0%, hsl(210 100% 54% / 0.12), transparent 28rem),
+    linear-gradient(180deg, hsl(var(--background)), hsl(240 5% 12%));
 }
 
 [data-tauri-drag-region] {

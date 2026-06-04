@@ -205,7 +205,7 @@
     "icon": "folder-open",
     "description": "打开指定小程序宿主对应的开发者工具",
     "type": "shell",
-    "command": "zsh -lc \"pnpm run open {{miniapp}}\"",
+    "command": "zsh -lc \"miniapp={{miniapp}}; if ! nc -z 127.0.0.1 8888 >/dev/null 2>&1; then echo '本地代理 127.0.0.1:8888 未启动，正在打开 Proxyman 2...'; open -a 'Proxyman 2'; for i in {1..20}; do nc -z 127.0.0.1 8888 >/dev/null 2>&1 && break; sleep 0.5; done; nc -z 127.0.0.1 8888 >/dev/null 2>&1 || { echo 'Proxyman 2 已打开，但 127.0.0.1:8888 仍不可用'; exit 1; }; fi; pnpm run open \\\"\\$miniapp\\\"\"",
     "workingDir": "~/work/brain/projects/miniapp-host/code",
     "params": [
       {
@@ -254,6 +254,27 @@
     "enabled": true,
     "timeoutMs": 60000,
     "workingDir": "~",
+    "sortOrder": 0
+  },
+  {
+    "id": "clean-hmos-app-data",
+    "name": "清理鸿蒙应用数据",
+    "icon": "trash-2",
+    "description": "通过 hdc 清理指定鸿蒙应用的数据（不卸载）",
+    "type": "shell",
+    "command": "bash scripts/clean-hmos-app.sh {{bundleName}}",
+    "workingDir": "~/work/quicktools",
+    "params": [
+      {
+        "name": "bundleName",
+        "label": "应用包名",
+        "type": "text",
+        "required": true,
+        "default": "com.anjuke.home"
+      }
+    ],
+    "enabled": true,
+    "timeoutMs": 60000,
     "sortOrder": 0
   }
 ]
